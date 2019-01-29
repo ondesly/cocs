@@ -1,19 +1,17 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
-#include <iostream>
+#include "math/mat4.hpp"
+#include "nodes/sprite.hpp"
+#include "renderer/render_area.hpp"
+#include "renderer/program.hpp"
+#include "textures/texture.hpp"
 
-#include "math/mat4.h"
-#include "nodes/sprite.h"
-#include "renderer/render_area.h"
-#include "renderer/program.h"
-#include "textures/texture.h"
+#include "renderer.hpp"
 
-#include "renderer.h"
-
-cc::renderer::renderer(const float2 &screen_size) {
+cc::renderer::renderer() {
 
     // Blend
 
@@ -28,16 +26,19 @@ cc::renderer::renderer(const float2 &screen_size) {
     glGenBuffers(1, &m_element_array_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_element_array_buffer);
 
-    // Viewport
+    //
 
-    glViewport(0, 0, GLsizei(screen_size.w), GLsizei(screen_size.h));
-
-    const auto projection_mat = mat4::make_ortho(0.f, screen_size.w, 0.f, screen_size.h, 1.f, -1.f);
-    m_program = new program(projection_mat);
-
-    // Clip
-
+    m_program = new program();
     m_render_area = new cc::render_area(RENDER_BUFFERS_COUNT);
+}
+
+void cc::renderer::set_screen_size(const cc::float2 &size) {
+    glViewport(0, 0, GLsizei(size.w), GLsizei(size.h));
+
+    const auto projection_mat = mat4::make_ortho(0.f, size.w, -size.h, 0, 1.f, -1.f);
+    m_program->set_projection_mat(projection_mat);
+
+    m_render_area->reset();
 }
 
 cc::renderer::~renderer() {
@@ -56,6 +57,10 @@ void cc::renderer::add_sprite(cc::sprite *const sprite) {
 
 void cc::renderer::update_render_area(const cc::quad &vertices) {
     m_render_area->add(vertices);
+}
+
+void cc::renderer::resume() {
+    m_render_area->reset();
 }
 
 void cc::renderer::render() {
@@ -90,8 +95,6 @@ void cc::renderer::render() {
         }
 
         // Bind buffers
-
-        std::cout << "vertices: " << filled_vertices_count << ", batches: " << m_batches.size() << std::endl;
 
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertex) * filled_vertices_count, m_vertices_buffer, GL_DYNAMIC_DRAW);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort) * filled_indices_count, m_indices_buffer, GL_DYNAMIC_DRAW);

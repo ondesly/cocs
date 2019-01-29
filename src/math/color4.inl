@@ -1,13 +1,13 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
 namespace cc {
 
     // -- Explicit basic constructors --
 
-    inline color4::color4(const unsigned char s) : r(s), g(s), b(s), a(s) {
+    inline color4::color4(const unsigned char c) : r(c), g(c), b(c), a(c) {
 
     }
 

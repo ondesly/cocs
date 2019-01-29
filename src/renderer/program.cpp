@@ -1,14 +1,14 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
 #include <cstddef>
 
-#include "math/mat4.h"
-#include "renderer/vertex.h"
+#include "math/mat4.hpp"
+#include "renderer/vertex.hpp"
 
-#include "program.h"
+#include "program.hpp"
 
 const char *cc::program::FRAGMENT_SHADER = R"(
         precision lowp float;
@@ -52,7 +52,7 @@ const char *cc::program::ATTRIBUTE_POSITION = "positionAttribute";
 const char *cc::program::ATTRIBUTE_COLOR = "colorAttribute";
 const char *cc::program::ATTRIBUTE_TEXTURE_COORDS = "textureCoordsAttribute";
 
-cc::program::program(const cc::mat4 &projection_mat) {
+cc::program::program() {
     m_program = glCreateProgram();
 
     const auto vertex_shader = compile_and_attach_shader(m_program, GL_VERTEX_SHADER, VERTEX_SHADER);
@@ -73,10 +73,13 @@ cc::program::program(const cc::mat4 &projection_mat) {
     glLinkProgram(m_program);
     glUseProgram(m_program);
 
-    glUniformMatrix4fv(glGetUniformLocation(m_program, UNIFORM_PROJECTION_MATRIX), 1, GL_FALSE, projection_mat.value_ptr());
-
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
+}
+
+void cc::program::set_projection_mat(const cc::mat4 &mat) {
+    glUseProgram(m_program);
+    glUniformMatrix4fv(glGetUniformLocation(m_program, UNIFORM_PROJECTION_MATRIX), 1, GL_FALSE, mat.value_ptr());
 }
 
 cc::program::~program() {

@@ -1,16 +1,16 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
 #include <algorithm>
 
 #include <clipper/clipper.hpp>
 
-#include "math/float2.h"
-#include "renderer/vertex.h"
+#include "math/float2.hpp"
+#include "renderer/vertex.hpp"
 
-#include "render_area.h"
+#include "render_area.hpp"
 
 cc::render_area::render_area(const size_t render_buffers_count) : m_render_buffers_count(render_buffers_count) {
 
@@ -35,7 +35,7 @@ void cc::render_area::add(const cc::quad &vertices) {
 }
 
 bool cc::render_area::is_changed() const {
-    return m_frames_from_last_change < m_render_buffers_count + 1;
+    return m_frames_from_last_change < m_render_buffers_count + 2 || m_frames_to_skip != 0;
 }
 
 void cc::render_area::update() {
@@ -75,10 +75,15 @@ void cc::render_area::update() {
 
 void cc::render_area::done() {
     m_vertices_count = 0;
+    m_frames_to_skip = m_frames_to_skip == 0 ? 0 : --m_frames_to_skip;
+}
+
+void cc::render_area::reset() {
+    m_frames_to_skip = m_render_buffers_count;
 }
 
 cc::render_area::status cc::render_area::get_intersection_status(const cc::quad &vertices) const {
-    if (m_vertices_count == MAX_VERTICES_COUNT) {
+    if (m_vertices_count == MAX_VERTICES_COUNT || m_frames_to_skip != 0) {
         return status::INSIDE;
     }
 
@@ -132,7 +137,7 @@ std::vector<cc::float2> cc::render_area::get_intersection(const cc::quad &vertic
 
     if (!solution.empty()) {
         for (auto point : solution.front()) {
-            result.push_back({point.X / MULTIPLIER, point.Y / MULTIPLIER});
+            result.emplace_back(point.X / MULTIPLIER, point.Y / MULTIPLIER);
         }
     }
 

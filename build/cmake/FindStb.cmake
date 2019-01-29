@@ -1,6 +1,6 @@
 #
 # Cocs Micro Engine
-# Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+# Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 #
 
 set(STB_ROOT ${CMAKE_CURRENT_LIST_DIR}/../../libs/stb)

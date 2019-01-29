@@ -1,9 +1,11 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
-#include "node.h"
+#include "core/events.hpp"
+
+#include "node.hpp"
 
 std::shared_ptr<cc::node> cc::node::create() {
     return std::make_shared<cc::node>();
@@ -73,7 +75,7 @@ const cc::float2 &cc::node::get_anchor() const {
 void cc::node::set_anchor(const float2 &anchor) {
     if (m_anchor != anchor) {
         m_anchor = anchor;
-        m_anchor_in_size = {-m_anchor.x * m_size.x, -m_anchor.y * m_size.y};
+        m_anchor_in_size = {m_anchor.x * m_size.x, m_anchor.y * m_size.y};
         m_transform_updated = m_node_transform_dirty = true;
     }
 }
@@ -85,8 +87,10 @@ const cc::float2 &cc::node::get_size() const {
 void cc::node::set_size(const cc::float2 &size) {
     if (m_size != size) {
         m_size = size;
-        m_anchor_in_size = {-m_anchor.x * m_size.x, -m_anchor.y * m_size.y};
+        m_anchor_in_size = {m_anchor.x * m_size.x, m_anchor.y * m_size.y};
         m_transform_updated = m_node_transform_dirty = true;
+
+        on_size_changed();
     }
 }
 
@@ -95,7 +99,7 @@ void cc::node::set_parent(cc::node *parent) {
     m_transform_updated = m_node_transform_dirty = true;
 }
 
-void cc::node::add_child(std::shared_ptr<cc::node> child) {
+void cc::node::add_child(const std::shared_ptr<cc::node> &child) {
     m_transform_updated = true;
 
     m_children.push_back(child);
@@ -107,7 +111,7 @@ void cc::node::add_child(std::shared_ptr<cc::node> child) {
     }
 }
 
-void cc::node::remove_child(std::shared_ptr<cc::node> child) {
+void cc::node::remove_child(const std::shared_ptr<cc::node> &child) {
     auto index = std::find(m_children.begin(), m_children.end(), child) - m_children.begin();
     if (index < m_children.size()) {
         if (m_is_running) {
@@ -131,16 +135,16 @@ void cc::node::remove_children() {
     m_children.clear();
 }
 
-void cc::node::draw(cc::renderer *renderer) {
+void cc::node::draw() {
 
 }
 
-void cc::node::update_transform(cc::renderer *renderer, const mat4 &transform) {
+void cc::node::update_transform(const mat4 &transform) {
     m_transform = transform;
     m_transform_updated = false;
 }
 
-void cc::node::visit(cc::renderer *const renderer, const mat4 &parent_transform, bool is_parent_dirty) {
+void cc::node::visit(const mat4 &parent_transform, const bool is_parent_dirty) {
     if (!m_is_visible) {
         return;
     }
@@ -150,19 +154,31 @@ void cc::node::visit(cc::renderer *const renderer, const mat4 &parent_transform,
     bool is_dirty = is_parent_dirty || m_transform_updated;
 
     if (is_dirty) {
-        update_transform(renderer, parent_transform * get_node_transform());
+        update_transform(parent_transform * get_node_transform());
     }
 
     // Draw
 
-    draw(renderer);
+    draw();
 
     // Children
 
     if (!m_children.empty()) {
         for (auto &child : m_children) {
-            child->visit(renderer, m_transform, is_dirty);
+            child->visit(m_transform, is_dirty);
         }
+    }
+}
+
+void cc::node::resume() {
+    for (const auto &child: m_children) {
+        child->resume();
+    }
+}
+
+void cc::node::pause() {
+    for (const auto &child: m_children) {
+        child->pause();
     }
 }
 
@@ -177,17 +193,31 @@ void cc::node::on_enter() {
 void cc::node::on_exit() {
     m_is_running = false;
 
+    stop_listening();
+
     for (const auto &child: m_children) {
         child->on_exit();
     }
 }
 
+void cc::node::on_size_changed() {
+
+}
+
+bool cc::node::is_running() const {
+    return m_is_running;
+}
+
+bool cc::node::is_contains(const cc::float2 &point) {
+    return true;
+}
+
 const cc::mat4 &cc::node::get_node_transform() {
     if (m_node_transform_dirty) {
-        m_node_transform = cc::mat4::make_translation(m_position);
+        m_node_transform = cc::mat4::make_translation(m_position.x, -m_position.y);
         m_node_transform.rotate_z(-m_rotation);
         m_node_transform.scale(m_scale);
-        m_node_transform.translate(m_anchor_in_size);
+        m_node_transform.translate(-m_anchor_in_size.x, m_anchor_in_size.y);
     }
 
     m_node_transform_dirty = false;
@@ -195,7 +225,7 @@ const cc::mat4 &cc::node::get_node_transform() {
     return m_node_transform;
 }
 
-const cc::color4 &cc::node::get_color(void) const {
+const cc::color4 &cc::node::get_color() const {
     return m_color;
 }
 
@@ -223,4 +253,12 @@ const cc::node *cc::node::get_parent() const {
 
 void cc::node::update_color() {
 
+}
+
+void cc::node::listen(const int id, const std::function<void(const cc::value &)> &fn) {
+    cc::events::i()->listen(this, id, fn);
+}
+
+void cc::node::stop_listening(const int id) {
+    cc::events::i()->stop_listening(this, id);
 }

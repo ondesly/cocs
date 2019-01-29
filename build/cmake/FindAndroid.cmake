@@ -1,6 +1,6 @@
 #
 # Cocs Micro Engine
-# Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+# Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 #
 
 # build native_app_glue as a static lib

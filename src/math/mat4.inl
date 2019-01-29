@@ -1,6 +1,6 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
 #include <cmath>
@@ -9,11 +9,11 @@ namespace cc {
 
     // -- Transform makers --
 
-    inline mat4 mat4::make_translation(const float2 &f) {
+    inline mat4 mat4::make_translation(const float x, const float y) {
         return {{1.f, 0.f, 0.f, 0.f},
                 {0.f, 1.f, 0.f, 0.f},
                 {0.f, 0.f, 1.f, 0.f},
-                {f[0], f[1], 0.f, 1.f}};
+                {x, y, 0.f, 1.f}};
     }
 
     inline mat4 mat4::make_scale(const float2 &f) {
@@ -69,8 +69,8 @@ namespace cc {
 
     // -- Transforms --
 
-    inline void mat4::translate(const float2 &f) {
-        value[3] = value[0] * f[0] + value[1] * f[1] + value[3];
+    inline void mat4::translate(const float x, const float y) {
+        value[3] = value[0] * x + value[1] * y + value[3];
     }
 
     inline void mat4::rotate_z(const float angle) {

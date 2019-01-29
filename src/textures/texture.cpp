@@ -1,52 +1,32 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
 #define STB_RECT_PACK_IMPLEMENTATION
 
 #include <stb/stb_rect_pack.h>
-#include <pugixml/pugixml.hpp>
 
-#include "core/engine.h"
-#include "core/files.h"
-#include "math/int2.h"
-#include "textures/image_renderer.h"
-#include "textures/text_renderer.h"
+#include "math/int2.hpp"
+#include "textures/frame.hpp"
 
-#include "texture.h"
+#include "texture.hpp"
 
-std::shared_ptr<cc::texture> cc::texture::create(const std::vector<cc::texture::params> &frames) {
-    return std::make_shared<cc::texture>(frames);
+std::shared_ptr<cc::texture> cc::texture::create(const std::unordered_map<std::string, std::shared_ptr<cc::frame>> &frames, const bool has_mipmaps/* = false*/) {
+    return std::make_shared<cc::texture>(frames, has_mipmaps);
 }
 
-cc::float2 get_original_size(const char *s) {
-    cc::float2 size;
-    std::sscanf(s, "%*f %*f %f %f", &size.w, &size.h);
-    return size;
+int cc::texture::pow2roundup(int x) {
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    return x + 1;
 }
 
-cc::float2 get_frame_size(const cc::float2 &size, const cc::float2 &original_size) {
-    if (size.w == 0) {
-        return {original_size.w * size.h / original_size.h, size.h};
-    } else if (size.h == 0) {
-        return {size.w, original_size.h * size.w / original_size.w};
-    } else {
-        return size;
-    }
-}
-
-cc::float2 get_actual_size(const cc::float2 &frame_size, const cc::float2 &original_size) {
-    if (frame_size.w / original_size.w > frame_size.h / original_size.h) {
-        return {frame_size.w, original_size.h * frame_size.w / original_size.w};
-    } else if (frame_size.w / original_size.w < frame_size.h / original_size.h) {
-        return {original_size.w * frame_size.h / original_size.h, frame_size.h};
-    } else {
-        return frame_size;
-    }
-}
-
-cc::int2 get_texture_size(stbrp_rect *begin, stbrp_rect *end) {
+cc::int2 cc::texture::get_texture_size(stbrp_rect *begin, stbrp_rect *end, const bool has_mipmaps) {
     cc::int2 size = {0, 0};
 
     for (auto r = begin; r < end; ++r) {
@@ -54,136 +34,94 @@ cc::int2 get_texture_size(stbrp_rect *begin, stbrp_rect *end) {
         size.h = std::max(size.h, r->y + r->h);
     }
 
+    if (has_mipmaps) {
+        size.w = pow2roundup(size.w);
+        size.h = pow2roundup(size.h);
+    }
+
     return size;
 }
 
-pugi::xml_document *read_image(const std::string &path) {
-    auto doc = new pugi::xml_document;
-
-    auto content = cc::engine::i()->get_files()->get_content(path);
-    auto result = doc->load_string(content.c_str());
-
-    if (result.status == pugi::xml_parse_status::status_ok) {
-        return doc;
-    } else {
-        delete doc;
-        return nullptr;
-    }
+cc::texture::texture(const std::unordered_map<std::string, std::shared_ptr<cc::frame>> &frames, const bool has_mipmaps)
+        : m_frames(frames), m_has_mipmaps(has_mipmaps) {
+    load();
 }
 
-cc::texture::texture(const std::vector<cc::texture::params> &frames) {
+void cc::texture::load() {
+
+    // Preparation
+
+    stbrp_context ctx;
+    auto nodes = new stbrp_node[MAX_TEXTURE_SIZE];
+    stbrp_init_target(&ctx, MAX_TEXTURE_SIZE, MAX_TEXTURE_SIZE, nodes, MAX_TEXTURE_SIZE);
+
+    auto src = new stbrp_rect[m_frames.size()];
+
+    // Frames load
+
+    auto p_src = src;
+    for (auto &pair : m_frames) {
+        pair.second->load();
+        pair.second->set_pack_rect(p_src++);
+    }
 
     // Pack
 
-    const int max_texture_size = 4096;
-
-    stbrp_context ctx;
-    auto nodes = new stbrp_node[max_texture_size];
-    stbrp_init_target(&ctx, max_texture_size, max_texture_size, nodes, max_texture_size);
-
-    auto src = new stbrp_rect[frames.size()];
-
-    //
-
-    std::vector<atlas_params> params;
-
-    stbrp_rect *p_src = src;
-    for (auto &frame : frames) {
-        if (frame.is_font) {
-            unsigned char *data;
-            auto size = engine::i()->get_text_renderer()->render(frame.text, frame.size.h, frame.size.w, data);
-
-            params.push_back({frame.name, nullptr, data, 0.f, {}});
-
-            *p_src = {int(p_src - src), stbrp_coord(size.w), stbrp_coord(size.h), 0, 0, 0};
-        } else {
-            auto image = read_image(frame.path + "/" + frame.name + ".svg");
-
-            if (!image) {
-                return;
-            }
-
-            auto root = image->child("svg");
-            auto original_size = get_original_size(root.attribute("viewBox").as_string());
-
-            auto frame_size = get_frame_size(frame.size, original_size);
-            auto actual_size = get_actual_size(frame_size, original_size);
-
-            float scale = std::max(frame_size.w / original_size.w, frame_size.h / original_size.h);
-
-            params.push_back({frame.name, image, nullptr, scale, (frame_size - actual_size) * frame.anchor});
-
-            *p_src = {int(p_src - src), stbrp_coord(frame_size.w), stbrp_coord(frame_size.h), 0, 0, 0};
-        }
-        ++p_src;
-    }
-
-    //
-
-    if (stbrp_pack_rects(&ctx, src, int(params.size())) == 0) {
+    if (stbrp_pack_rects(&ctx, src, int(m_frames.size())) == 0) {
         return;
     }
+    delete[] nodes;
 
-    //
+    // Data
 
-    auto size = get_texture_size(src, src + params.size());
+    auto tex_size = get_texture_size(src, p_src, m_has_mipmaps);
 
-    auto data = new unsigned char[size.w * size.h * 4];
-    std::fill(data, data + size.w * size.h * 4, '\0');
+    auto data = new unsigned char[tex_size.w * tex_size.h * 4];
+    std::fill(data, data + tex_size.w * tex_size.h * 4, '\0');
 
-    image_renderer renderer(data, size.w, size.h);
+    // Render
 
-    for (auto r = src; r < src + params.size(); ++r) {
-        auto rect = float4(r->x, r->y, r->w, r->h);
-
-        auto &p = params[r->id];
-
-        if (p.doc) {
-            renderer.render(p.doc->child("svg"), rect, p.scale, p.anchor);
-        } else if (p.data) {
-            int atlas_stride = size.w * 4;
-            int atlas_begin = int(rect.x * 4 + rect.y * atlas_stride);
-            int w = int(rect.w * 4);
-            int h = int(rect.h);
-
-            for (int i = 0; i < h; ++i) {
-                std::copy(&p.data[i * w], &p.data[i * w + w], &data[atlas_begin + i * atlas_stride]);
-            }
-        }
-
-        m_frames[p.name] = rect;
+    for (auto &pair : m_frames) {
+        pair.second->update_rect();
+        pair.second->render(data, tex_size);
+        pair.second->clear();
     }
 
-    //
+    // Set
 
-    set_data(data, size.w, size.h);
+    set_data(data, tex_size, m_has_mipmaps);
 
-    //
+    // Clear
 
     delete[] data;
     delete[] src;
-    delete[] nodes;
 }
 
-const cc::float4 &cc::texture::get_frame(const std::string &name) {
-    return m_frames[name];
+const cc::int4 &cc::texture::get_frame(const std::string &name) {
+    return m_frames[name]->get_rect();
 }
 
-void cc::texture::set_data(const unsigned char *data, const int width, const int height) {
+void cc::texture::set_data(const unsigned char *data, const cc::int2 &size, const bool has_mipmaps) {
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
     glGenTextures(1, &m_name);
     glBindTexture(GL_TEXTURE_2D, m_name);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.w, size.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+    if (has_mipmaps) {
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+    } else {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    }
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-
-    m_size = cc::float2(width, height);
+    m_size = cc::float2(size.w, size.h);
 }
 
 cc::texture::~texture() {
@@ -198,4 +136,10 @@ GLuint cc::texture::get_name() const {
 
 const cc::float2 &cc::texture::get_size() const {
     return m_size;
+}
+
+void cc::texture::check() {
+    if (glIsTexture(m_name) != GL_TRUE) {
+        load();
+    }
 }

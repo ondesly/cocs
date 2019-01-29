@@ -1,121 +1,200 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
 #include <android_native_app_glue.h>
 #include <jni.h>
 
-#include "jvm.h"
+#include "jvm.hpp"
 
-cc::jvm::jvm(ANativeActivity *const activity) : m_activity(activity) {
+cc::clazz::clazz(const std::string &name) : m_name(name) {
+    auto env = cc::jvm::i()->get_env();
+    m_class = (jclass) env->NewGlobalRef(env->FindClass(name.c_str()));
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
 
 }
+
+cc::clazz::~clazz() {
+    auto env = cc::jvm::i()->get_env();
+    env->DeleteGlobalRef(m_class);
+}
+
+jclass cc::clazz::get_clazz() {
+    return m_class;
+}
+
+//
+
+cc::static_method::static_method(cc::clazz *cl, const std::string &name, const std::string &signature)
+        : m_class(cl) {
+    auto env = cc::jvm::i()->get_env();
+    m_method_id = env->GetStaticMethodID(cl->get_clazz(), name.c_str(), signature.c_str());
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+}
+
+jobject cc::static_method::call(int n, ...) {
+    auto env = cc::jvm::i()->get_env();
+
+    va_list args;
+    va_start(args, n);
+
+    auto object = env->CallStaticObjectMethodV(m_class->get_clazz(), m_method_id, args);
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+
+    va_end(args);
+
+    return object;
+}
+
+//
+
+cc::method::method(cc::clazz *cl, const std::string &name, const std::string &signature) {
+    auto env = cc::jvm::i()->get_env();
+    m_method_id = env->GetMethodID(cl->get_clazz(), name.c_str(), signature.c_str());
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+}
+
+void cc::method::call(jobject obj, ...) {
+    auto env = cc::jvm::i()->get_env();
+
+    va_list args;
+    va_start(args, obj);
+
+    env->CallVoidMethodV(obj, m_method_id, args);
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+
+    va_end(args);
+}
+
+int cc::method::call_int(jobject obj, ...) {
+    auto env = cc::jvm::i()->get_env();
+
+    va_list args;
+    va_start(args, obj);
+
+    auto value = env->CallIntMethodV(obj, m_method_id, args);
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+
+    va_end(args);
+
+    return value;
+}
+
+float cc::method::call_float(jobject obj, ...) {
+    auto env = cc::jvm::i()->get_env();
+
+    va_list args;
+    va_start(args, obj);
+
+    auto value = env->CallFloatMethodV(obj, m_method_id, args);
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+
+    va_end(args);
+
+    return value;
+}
+
+jobject cc::method::call_object(jobject obj, ...) {
+    auto env = cc::jvm::i()->get_env();
+
+    va_list args;
+    va_start(args, obj);
+
+    auto object = env->CallObjectMethodV(obj, m_method_id, args);
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+
+    va_end(args);
+
+    return object;
+}
+
+//
+
+cc::constructor::constructor(cc::clazz *cl, const std::string &signature) : m_class(cl) {
+    auto env = cc::jvm::i()->get_env();
+    m_method_id = env->GetMethodID(cl->get_clazz(), "<init>", signature.c_str());
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+}
+
+jobject cc::constructor::call(int n, ...) {
+    auto env = cc::jvm::i()->get_env();
+
+    va_list args;
+    va_start(args, n);
+
+    auto object = env->NewObjectV(m_class->get_clazz(), m_method_id, args);
+
+    va_end(args);
+
+    return object;
+}
+
+//
+
+cc::static_field::static_field(cc::clazz *cl, const std::string &name, const std::string &signature)
+        : m_class(cl) {
+    auto env = cc::jvm::i()->get_env();
+    m_field_id = env->GetStaticFieldID(cl->get_clazz(), name.c_str(), signature.c_str());
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+}
+
+int cc::static_field::get_int() {
+    auto env = cc::jvm::i()->get_env();
+    auto value = env->GetStaticIntField(m_class->get_clazz(), m_field_id);
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+    return value;
+}
+
+jobject cc::static_field::get_object() {
+    auto env = cc::jvm::i()->get_env();
+    auto value = env->GetStaticObjectField(m_class->get_clazz(), m_field_id);
+    if (env->ExceptionCheck()) throw std::logic_error("jni");
+    return value;
+}
+
+//
 
 cc::jvm::~jvm() {
-    JNIEnv *env;
-    m_activity->vm->AttachCurrentThread(&env, nullptr);
-
-    for (auto pair : m_classes) {
-        env->DeleteGlobalRef(pair.second);
-    }
-    for (auto pair : m_objects) {
-        env->DeleteGlobalRef(pair.second);
-    }
-
     m_activity->vm->DetachCurrentThread();
 }
 
-void cc::jvm::attach_thread(JNIEnv **env) {
-    m_activity->vm->AttachCurrentThread(env, nullptr);
+void cc::jvm::set_activity(ANativeActivity *const activity) {
+    m_activity = activity;
 }
 
-void cc::jvm::detach_thread() {
-    m_activity->vm->DetachCurrentThread();
+ANativeActivity *cc::jvm::get_activity() const {
+    return m_activity;
 }
 
-jclass cc::jvm::clazz(const std::string &name) {
-    return m_classes[name];
-}
-
-jmethodID cc::jvm::method(const std::string &name) {
-    return m_method_ids[name];
-}
-
-jfieldID cc::jvm::field(const std::string &name) {
-    return m_field_ids[name];
-}
-
-int cc::jvm::int_field(const std::string &name) {
-    return m_int_fields[name];
-}
-
-jobject cc::jvm::object(const std::string &name) {
-    return m_objects[name];
-}
-
-bool cc::jvm::preload_class(JNIEnv *env, const std::string &class_name) {
-    auto object_class = env->FindClass(class_name.c_str());
-    if (object_class) {
-        auto name = class_name.substr(class_name.rfind("/") + 1);
-        m_classes[name] = static_cast<jclass>(env->NewGlobalRef(object_class));
-        return true;
+JNIEnv *cc::jvm::get_env() {
+    auto it = m_envs.find(std::this_thread::get_id());
+    if (it == m_envs.end()) {
+        JNIEnv *env = nullptr;
+        m_activity->vm->AttachCurrentThread(&env, nullptr);
+        m_envs[std::this_thread::get_id()] = env;
+        return env;
     } else {
-        return false;
+        return (*it).second;
     }
 }
 
-bool cc::jvm::preload_method_id(JNIEnv *env, const std::string &class_name, const char *method_name,
-                                const char *sig, const bool is_static/* = false*/) {
-    jmethodID method_id;
-    if (is_static) {
-        method_id = env->GetStaticMethodID(m_classes[class_name], method_name, sig);
-    } else {
-        method_id = env->GetMethodID(m_classes[class_name], method_name, sig);
-    }
-
-    if (method_id) {
-        m_method_ids[class_name + "::" + method_name] = method_id;
-        return true;
-    } else {
-
-        return false;
-    }
+jobject cc::jvm::new_global_ref(jobject obj) {
+    auto env = cc::jvm::i()->get_env();
+    return env->NewGlobalRef(obj);
 }
 
-bool cc::jvm::preload_field_id(JNIEnv *env, const std::string &class_name, const char *field_name,
-                               const char *sig) {
-    auto field_id = env->GetStaticFieldID(m_classes[class_name], field_name, sig);
-    if (field_id) {
-        m_field_ids[class_name + "::" + field_name] = field_id;
-        return true;
-    } else {
-        return false;
-    }
+void cc::jvm::delete_global_ref(jobject obj) {
+    auto env = cc::jvm::i()->get_env();
+    env->DeleteGlobalRef(obj);
 }
 
-bool cc::jvm::preload_object(JNIEnv *env, const char *class_name, const char *constructor_name) {
-    auto object = env->NewObject(m_classes[class_name], m_method_ids[constructor_name]);
-    if (object) {
-        m_objects[class_name] = env->NewGlobalRef(object);
-        return true;
-    } else {
-        return false;
-    }
+jstring cc::jvm::new_string(const std::string &s) {
+    auto env = cc::jvm::i()->get_env();
+    return env->NewStringUTF(s.c_str());
 }
 
-bool cc::jvm::preload_object_field(JNIEnv *env, const char *class_name, const char *field_name) {
-    auto object = env->GetStaticObjectField(m_classes[class_name], m_field_ids[field_name]);
-    if (object) {
-        m_objects[class_name] = env->NewGlobalRef(object);
-        return true;
-    } else {
-        return false;
-    }
-}
-
-bool cc::jvm::preload_int_field(JNIEnv *env, const char *class_name, const char *field_name) {
-    auto value = env->GetStaticIntField(m_classes[class_name], m_field_ids[field_name]);
-    m_int_fields[class_name] = value;
-    return true;
+void cc::jvm::delete_local_ref(jobject obj) {
+    auto env = cc::jvm::i()->get_env();
+    return env->DeleteLocalRef(obj);
 }

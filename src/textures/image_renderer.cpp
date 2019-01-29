@@ -1,6 +1,6 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
 #include <cmath>
@@ -8,10 +8,10 @@
 #include <cairo/cairo.h>
 #include <pugixml/pugixml.hpp>
 
-#include "math/float2.h"
-#include "math/float4.h"
+#include "math/float2.hpp"
+#include "math/int4.hpp"
 
-#include "image_renderer.h"
+#include "image_renderer.hpp"
 
 cc::image_renderer::image_renderer(unsigned char *data, int width, int height) {
     auto surface = cairo_image_surface_create_for_data(data, CAIRO_FORMAT_ARGB32, width, height, width * 4);
@@ -23,7 +23,7 @@ cc::image_renderer::~image_renderer() {
     cairo_destroy(m_cr);
 }
 
-void cc::image_renderer::render(const pugi::xml_node &root, const cc::float4 &rect, float scale, const cc::float2 &anchor) {
+void cc::image_renderer::render(const pugi::xml_node &root, const cc::int4 &rect, float scale, const cc::float2 &anchor) {
     cairo_save(m_cr);
 
     //
@@ -229,7 +229,7 @@ void cc::image_renderer::update_parameters(const char cmd, const char prev_cmd, 
 }
 
 void cc::image_renderer::render_path(const char *src) {
-    cc::image_renderer::params params;
+    cc::image_renderer::params params{};
     char cmd = 0;
     char prev_cmd = 0;
 

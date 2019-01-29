@@ -1,13 +1,13 @@
 //
 // Cocs Micro Engine
-// Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+// Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 //
 
 #include <streambuf>
 
 #include <android/log.h>
 
-#include "log_buffer.h"
+#include "log_buffer.hpp"
 
 const char *cc::log_buffer::TAG = "COCS";
 
@@ -24,6 +24,8 @@ int cc::log_buffer::overflow(const int c) {
 }
 
 int cc::log_buffer::sync() {
+    __android_log_print(ANDROID_LOG_INFO, TAG, "");
+
     int rc = 0;
     if (pbase() != pptr()) {
         __android_log_print(ANDROID_LOG_INFO, TAG, "%s",

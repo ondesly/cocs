@@ -1,6 +1,6 @@
 #
 # Cocs Micro Engine
-# Copyright (C) 2018 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
+# Copyright (C) 2018-2019 Dmitriy Torkhov <dmitriytorkhov@gmail.com>
 #
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake/)
@@ -30,15 +30,13 @@ include_directories(
 
 set(COCS_SRC
         ${COCS_SRC_ROOT}/core/android/activity.cpp
-        ${COCS_SRC_ROOT}/core/android/audio_impl.cpp
+        ${COCS_SRC_ROOT}/core/android/device.cpp
         ${COCS_SRC_ROOT}/core/android/log_buffer.cpp
-        ${COCS_SRC_ROOT}/core/android/files_impl.cpp
         ${COCS_SRC_ROOT}/core/android/jvm.cpp
 
         ${COCS_SRC_ROOT}/core/engine.cpp
-        ${COCS_SRC_ROOT}/core/entity.cpp
-        ${COCS_SRC_ROOT}/core/scheduler.cpp
-        ${COCS_SRC_ROOT}/core/touches.cpp
+        ${COCS_SRC_ROOT}/core/events.cpp
+        ${COCS_SRC_ROOT}/core/value.cpp
 
         ${COCS_SRC_ROOT}/nodes/node.cpp
         ${COCS_SRC_ROOT}/nodes/sprite.cpp
@@ -47,11 +45,12 @@ set(COCS_SRC
         ${COCS_SRC_ROOT}/renderer/render_area.cpp
         ${COCS_SRC_ROOT}/renderer/renderer.cpp
 
-        ${COCS_SRC_ROOT}/textures/android/text_renderer_impl.cpp
+        ${COCS_SRC_ROOT}/textures/empty_frame.cpp
+        ${COCS_SRC_ROOT}/textures/frame.cpp
         ${COCS_SRC_ROOT}/textures/image_renderer.cpp
-        ${COCS_SRC_ROOT}/textures/texture.cpp
-
-        ${COCS_SRC_ROOT}/utils/timing.cpp)
+        ${COCS_SRC_ROOT}/textures/svg_frame.cpp
+        ${COCS_SRC_ROOT}/textures/text_frame.cpp
+        ${COCS_SRC_ROOT}/textures/texture.cpp)
 
 #
 
