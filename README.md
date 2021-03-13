@@ -1,8 +1,8 @@
 <img src="https://github.com/ondesly/cocs/blob/master/icon.png" alt="cocs" width=128>
 
-# Cocs v0.2
+# Cocs
 
-Cocs is a C++ micro game engine targeted for development of 2D games for mobile platforms.
+Thesis project for Master's degree.
 
 ## Features
 
